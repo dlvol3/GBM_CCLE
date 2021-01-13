@@ -1,4 +1,4 @@
-# Using CCLE gene expression data, microRNA data -> TMZ resistance in GBM cell lines
+# Using gdsc exp data -> TMZ resistance in GBM cell lines
 # NERF V0.3
 # Yue Zhang <yue.zhang@lih.lu>
 
@@ -23,38 +23,7 @@ from scipy import stats
 import re
 
 
-#%%
-
-if platform.system() == 'Windows':
-    # Windows PC at home
-    # gdscic = pd.read_csv('P:/VM/Drug/data/output/GDSCIC50.csv')
-    # ccleic = pd.read_csv('C:/Users/Yue/PycharmProjects/data/CCLEIC50.csv')
-    cclemiRNA = pd.read_csv('C:/Users/Yue/PycharmProjects/data/GBM/CCLE/CCLE_miRNA_20181103.csv')  # Original miRNA data
-    ccle_cellline = pd.read_table('C:/Users/Yue/PycharmProjects/data/GBM/CCLE/Cell_lines_annotations_20181226.txt')
-# transpose the table-> ready for joining with the GDSC
-
-miRNA = cclemiRNA.T
-miRNAnoH = miRNA.iloc[2:,]
-miRNAnoH.columns = miRNA.iloc[1,]
-miRNAnoH['CCLE_ID'] = miRNAnoH.index
-miRNAnoH = miRNAnoH.reset_index(drop = True)
-miRNA_SampleName = pd.merge(miRNAnoH, ccle_cellline.iloc[:,[0,2]],how = 'left', left_on='CCLE_ID', right_on='CCLE_ID')
-miRNA_S = miRNA_SampleName.drop(["CCLE_ID"],axis = 1)  ## Ready for joining with TMZ_GDSC_EXP data
-miRNA_S['Name'] = miRNA_S['Name'].replace({"U-251 MG":"U251"})
-
-
-#%% Simple search function for pandas
-
-def searchp(df, term):
-    for row in range(df.shape[0]):  # df is the DataFrame
-        for col in range(df.shape[1]):
-            if df.iloc[row, col] == term:
-                print(row, col)
-                break
-#%% Check if the substitution success?
-searchp(miRNA_S, term = "U-251 MG")
 #%% GBM cell lines in GDSC
-
 
 gdsc = pd.read_csv('C:/Users/Yue/PycharmProjects/data/GBM/readyforpython_sub.csv')
 gdsc = gdsc.rename(columns = {'Cancer.Type..matching.TCGA.label.':'cancertype'})
@@ -66,9 +35,9 @@ gdsc = gdsc.iloc[0:201,]
 
 # join GDSC exp data with miRNA
 
-allinone = pd.merge(gdsc, miRNA_S, how = "left", left_on="Sample.Name", right_on="Name")
+allinone = gdsc
 # Create list for subset
-flist = list(range(2, (len(allinone.columns)-1), 1))
+flist = list(range(2, (len(allinone.columns)), 1))
 # ciLapa.insert(0, 1)
 
 # subset two sets
@@ -172,7 +141,7 @@ random_forest = RandomForestClassifier(n_estimators=600, random_state=49, max_fe
 # Drop SENRES
 
 tmz_ready_label_all = tmz_ready.loc[:, "Temozolomide"]
-test_98G_U251 = tmz_ready.iloc[[45,46],:]
+test_98G_U251 = tmz_ready.iloc[[84,87],:]
 train_tmz = tmz_ready.drop([84,87],axis = 0)
 
 train_labels = train_tmz.loc[:, "Temozolomide"]
@@ -230,7 +199,7 @@ fl = pd.DataFrame({
 
 
 fls = fl.sort_values('score', ascending=False)
-fls.to_csv("feature_importances.csv")
+fls.to_csv("feature_importances_mRNAonly.csv")
 #%%
 # feature_importance_values = random_forest.feature_importances_
 # feature_importances = pd.DataFrame({'feature': features, 'importance': feature_importance_values})
@@ -241,7 +210,7 @@ pd_f = extarget(random_forest, test, pd_ff)
 pd_nt = nerftab(pd_f)
 
 t98g_localnerf = localnerf(pd_nt, 1)
-t98g_g_twonets = twonets(t98g_localnerf, str('T98G_'), index, feag,index1=8, index2 = 8)
+t98g_g_twonets = twonets(t98g_localnerf, str('T98G_mRNAonly'), index, feag,index1=8, index2 = 8)
 
 #%% BRO ranking
 g_pagerank = t98g_localnerf.replace(index, feag)
@@ -254,17 +223,16 @@ rkrank = sorted(rktest, key=rktest.get, reverse=True)
 fea_corr = rkrank[0:100]
 # top100[i] = fea_corr
 # rkrank = [featurelist[i] for i in rkrank]
-fn = "pagerank_sample_T98G.txt"
+fn = "pagerank_sample_T98G_mRNAonly.txt"
 with open(os.getcwd() + '/output/pagerank/' + fn, 'w') as f:
     for item in rkrank:
         f.write("%s\n" % item)
-
 #%%
 import pickle
 object = pd_ff
-filehandler = open('pd_ff_t98G_index1', 'wb')
+filehandler = open('pd_ff_t98Gmrna_index1', 'wb')
 pickle.dump(object, filehandler)
 
 object = pd_f
-filehandler = open('pd_f_t98G_index1', 'wb')
+filehandler = open('pd_f_t98Gmrna_index1', 'wb')
 pickle.dump(object, filehandler)
